@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { relative, resolve } from "node:path";
-import { applySwcTransform } from "@workflow/builders";
 import type { Plugin, ResolvedConfig } from "vite";
 
 const VIRTUAL_MODULE_WORKFLOW_CODE = "\0virtual:workflow-code";
@@ -30,12 +30,15 @@ export interface WorkflowCloudflareOptions {
 /**
  * Vite plugin for Workflow DevKit on Cloudflare Workers.
  *
- * In dev mode: watches workflow source files, re-runs the SWC transform,
- * produces the workflow code string and static workflow function imports,
- * and feeds them into @cloudflare/vite-plugin's pipeline for HMR.
+ * In dev mode: watches workflow source files, re-runs the SWC transform
+ * (both workflow-mode and client-mode), produces virtual modules for
+ * workflow functions, and feeds them into @cloudflare/vite-plugin for HMR.
  *
  * In production (`vite build`): invokes CloudflareBuilder to produce the
- * full Worker bundle, wrangler config, and manifest.
+ * two-worker output (service worker + client library) and wrangler configs.
+ *
+ * The user always writes `export default withWorkflow(app)` — same code
+ * regardless of build tool.
  *
  * @example
  * ```ts
@@ -57,7 +60,6 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
   let isBuild = false;
   let workflowCodeString = "";
   let workflowNames: string[] = [];
-
   async function runTransform(): Promise<void> {
     const { glob } = await import("tinyglobby");
     const inputFiles = (
@@ -77,12 +79,16 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
     const allCode: string[] = [];
     const newWorkflowNames: string[] = [];
 
+    const { applySwcTransform } = await import("@workflow/builders");
+
     for (const file of inputFiles) {
       const source = await readFile(file, "utf8");
-      const result = await applySwcTransform(relative(workingDir, file), source, "workflow", file);
-      if (result.code) {
-        allCode.push(result.code);
-        newWorkflowNames.push(...extractWorkflowNames(result.code));
+      const relPath = relative(workingDir, file);
+
+      const workflowResult = await applySwcTransform(relPath, source, "workflow", file);
+      if (workflowResult.code) {
+        allCode.push(workflowResult.code);
+        newWorkflowNames.push(...extractWorkflowNames(workflowResult.code));
       }
     }
 
@@ -123,6 +129,14 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
       return null;
     },
 
+    transform(_code, id) {
+      // The SWC client transform is applied at the workflow source level
+      // during runTransform(). User app code imports workflow functions
+      // which already have .workflowId attached via the transform.
+      if (id.includes("\0")) return null;
+      return null;
+    },
+
     configureServer(server) {
       for (const dir of dirs) {
         const watchDir = resolve(workingDir, dir);
@@ -131,7 +145,6 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
     },
 
     async handleHotUpdate({ file, server }) {
-      // Check if the changed file is in a workflow directory
       const isWorkflowFile = dirs.some((dir) => file.startsWith(resolve(workingDir, dir)));
 
       if (!isWorkflowFile) return;
@@ -139,7 +152,6 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
       console.log("[workflow-cloudflare] Re-transforming workflows...");
       await runTransform();
 
-      // Invalidate virtual modules to trigger reload
       const codeModule = server.moduleGraph.getModuleById(VIRTUAL_MODULE_WORKFLOW_CODE);
       const functionsModule = server.moduleGraph.getModuleById(VIRTUAL_MODULE_WORKFLOW_FUNCTIONS);
 
@@ -157,23 +169,23 @@ export function workflowCloudflare(options?: WorkflowCloudflareOptions): Plugin 
     },
 
     config() {
+      const req = createRequire(resolve(workingDir, "package.json"));
+      const resolvePolyfill = (subpath: string) => req.resolve(`workflow-world-cloudflare/${subpath}`);
+
       return {
         resolve: {
           alias: [
             {
               find: "node:vm",
-              replacement: resolve(workingDir, "node_modules/workflow-world-cloudflare/dist/polyfills/vm.js"),
+              replacement: resolvePolyfill("polyfills/vm"),
             },
             {
               find: "node:module",
-              replacement: resolve(workingDir, "node_modules/workflow-world-cloudflare/dist/polyfills/module.js"),
+              replacement: resolvePolyfill("polyfills/module"),
             },
             {
               find: "@vercel/functions",
-              replacement: resolve(
-                workingDir,
-                "node_modules/workflow-world-cloudflare/dist/polyfills/vercel-functions.js",
-              ),
+              replacement: resolvePolyfill("polyfills/vercel-functions"),
             },
           ],
         },

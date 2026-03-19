@@ -1,0 +1,8 @@
+main = "src/worker.ts"
+
+[[kv_namespaces]]
+binding = "USERS"
+id = "user-onboarding-kv"
+
+[vars]
+WORKFLOW_INSPECT_TOKEN = "dev-secret"

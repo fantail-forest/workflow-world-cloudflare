@@ -5,7 +5,7 @@ The `vite-plugin-workflow-cloudflare` plugin integrates the Workflow DevKit buil
 ## Install dependencies
 
 ```bash
-npm add @workflow/core workflow-world-cloudflare
+npm add workflow workflow-world-cloudflare @workflow/errors @workflow/world zod
 npm add -D vite-plugin-workflow-cloudflare @cloudflare/vite-plugin vite wrangler
 ```
 
@@ -20,11 +20,8 @@ import { workflowCloudflare } from 'vite-plugin-workflow-cloudflare';
 
 export default defineConfig({
   plugins: [
-    workflowCloudflare(),
-    cloudflare({
-      configPath: './wrangler.toml',
-      persistState: true,
-    }),
+    workflowCloudflare({ appName: 'my-app' }),
+    cloudflare({ persistState: true }),
   ],
 });
 ```
@@ -56,12 +53,24 @@ project/
 
 ## Wrangler config for local dev
 
-You need a `wrangler.toml` for local development. You can either:
+## Worker entry point
 
-1. Generate one with `workflow-cloudflare build --name <app-name>` (recommended for consistency)
-2. Write one manually for dev-only use
+Your worker wraps its default export with `withWorkflow()`:
 
-For local dev, D1 and DO state is persisted automatically when `persistState: true` is set in the cloudflare plugin. This means your workflow state survives restarts.
+```ts
+import { withWorkflow } from "workflow-world-cloudflare/with-workflow";
+import { start } from "@workflow/core/runtime";
+import { myWorkflow } from "../workflows/my-workflow";
+
+export default withWorkflow({
+  async fetch(request, env, ctx) {
+    const run = await start(myWorkflow, [await request.json()]);
+    return Response.json({ runId: run.runId });
+  },
+});
+```
+
+With Vite, import workflow functions directly from source -- the plugin handles the SWC transforms.
 
 ## Starting the dev server
 
@@ -72,7 +81,7 @@ npx vite dev
 This starts a local `workerd` runtime via `@cloudflare/vite-plugin` with:
 
 - Your workflow files compiled via SWC
-- Module aliases applied for `node:vm`, `node:module`, `@vercel/functions`, `cbor-x`
+- Module aliases applied for polyfills
 - D1, Durable Objects, and Queues simulated locally via Miniflare
 
 Changes to workflow files trigger an HMR update. See [HMR](/vite/hmr) for details.

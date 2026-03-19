@@ -2,26 +2,31 @@
 
 Test your workflows locally without deploying to Cloudflare. Both `wrangler dev` and `vite dev` use Miniflare to simulate the Cloudflare runtime.
 
-## Using `wrangler dev`
+## Using `workflow-cloudflare dev`
 
-After building your Worker bundle:
+After building:
 
 ```bash
-# Build the Worker
+# Build both workers
 workflow-cloudflare build --name <app-name>
 
-# Start local dev server
-wrangler dev
+# Start both workers locally
+workflow-cloudflare dev
 ```
 
-This starts a local server (default: `http://localhost:8787`) with Miniflare simulating D1, Durable Objects, and Queues.
+This starts:
 
-Trigger a workflow:
+- **Service worker** on port 8787 (workflow infrastructure)
+- **Your worker** on port 8788 (your application)
+
+The Service Binding between them is resolved locally by Miniflare.
+
+Trigger a workflow through your worker:
 
 ```bash
-curl -X POST http://localhost:8787/.well-known/workflow/v1/flow \
+curl -X POST http://localhost:8788/start \
   -H 'Content-Type: application/json' \
-  -d '{"workflowName": "helloWorkflow", "input": "World"}'
+  -d '{"name": "World"}'
 ```
 
 ### Persistent state
@@ -30,7 +35,7 @@ By default, `wrangler dev` persists D1 and DO state in `.wrangler/state/`. This 
 
 ```bash
 rm -rf .wrangler/state/
-wrangler dev
+workflow-cloudflare dev
 ```
 
 ## Using `vite dev`

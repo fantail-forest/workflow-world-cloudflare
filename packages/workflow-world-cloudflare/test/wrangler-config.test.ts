@@ -6,6 +6,7 @@ describe("resource namespacing", () => {
     const names = deriveResourceNames("billing");
     expect(names).toEqual({
       workerName: "billing",
+      serviceWorkerName: "billing-workflow",
       d1DatabaseName: "billing-workflow-db",
       runQueueName: "billing-workflow-runs",
       stepQueueName: "billing-workflow-steps",

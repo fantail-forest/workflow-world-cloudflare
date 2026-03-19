@@ -16,7 +16,12 @@ interface CloudflareExecutionContext {
   passThroughOnException(): void;
 }
 
-export const executionContextStorage = new AsyncLocalStorage<CloudflareExecutionContext>();
+const EXEC_CTX_KEY = Symbol.for("workflow-cloudflare:executionContextStorage");
+const g = globalThis as Record<symbol, unknown>;
+if (!g[EXEC_CTX_KEY]) {
+  g[EXEC_CTX_KEY] = new AsyncLocalStorage<CloudflareExecutionContext>();
+}
+export const executionContextStorage = g[EXEC_CTX_KEY] as AsyncLocalStorage<CloudflareExecutionContext>;
 
 export function waitUntil(promise: Promise<unknown>): void {
   const ctx = executionContextStorage.getStore();

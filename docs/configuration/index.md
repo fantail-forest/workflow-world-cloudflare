@@ -4,9 +4,14 @@ The Cloudflare builder generates a `wrangler.toml` (or `wrangler.jsonc`) with al
 
 ## How it works
 
-Every time you run `workflow-cloudflare build`, the builder:
+Every time you run `workflow-cloudflare build`, the builder generates two wrangler configs:
 
-1. Generates a base config with required bindings (D1, Durable Objects, Queues, migrations)
+1. **Service worker config** (`dist/service-worker/wrangler.toml`) -- contains all workflow bindings (D1, Durable Objects, Queues, migrations)
+2. **User worker config** (`wrangler.toml`) -- contains the Service Binding to the service worker, merged with your overrides
+
+For the user worker config, the builder:
+
+1. Generates a base config with the Service Binding and compatibility flags
 2. Looks for a user override file (`wrangler.app.toml` or `wrangler.app.jsonc`)
 3. Deep-merges the override on top of the base config
 4. Writes the final config to `wrangler.toml` (or `wrangler.jsonc`)
@@ -36,11 +41,12 @@ The builder prevents this by namespacing all account-scoped resources under the 
 npx workflow-cloudflare build --name billing
 ```
 
-This produces a wrangler config with resource names derived from `billing`:
+This produces configs with resource names derived from `billing`:
 
 | Resource | Generated name |
 |---|---|
-| Worker | `billing` |
+| User worker | `billing` |
+| Service worker | `billing-workflow` |
 | D1 database | `billing-workflow-db` |
 | Run queue | `billing-workflow-runs` |
 | Step queue | `billing-workflow-steps` |
@@ -94,7 +100,9 @@ This means you can add bindings, routes, or other config without repeating the b
 
 ## Required bindings
 
-The builder automatically generates these bindings:
+### Service worker bindings (auto-generated)
+
+The service worker's `wrangler.toml` contains:
 
 | Binding | Type | Purpose |
 |---|---|---|
@@ -104,15 +112,24 @@ The builder automatically generates these bindings:
 | `WORKFLOW_QUEUE` | Queue Producer | Workflow invocation scheduling |
 | `WORKFLOW_STEP_QUEUE` | Queue Producer | Step invocation scheduling |
 
-These binding names are constants defined in `workflow-world-cloudflare` and used by both the builder and runtime. Do not rename them in your override file. The underlying Cloudflare resource names (database name, queue names) can be customized -- see [Overriding resource names](#overriding-resource-names).
+### User worker bindings (auto-generated)
+
+Your worker's `wrangler.toml` contains:
+
+| Binding | Type | Purpose |
+|---|---|---|
+| `WORKFLOW` | Service Binding | Connection to the workflow service worker |
+
+Plus any custom bindings from your `wrangler.app.toml`.
 
 ## Runtime initialization
 
-The generated Worker entry point handles all initialization automatically:
+In your worker, `withWorkflow()` handles all initialization:
 
-1. Calls `setWorld(await createCloudflareWorld(env))` to inject the Cloudflare world implementation and auto-create D1 index tables
-2. Wraps every request in `envStorage.run(env, ...)` to make bindings accessible via `getCloudflareEnv()`
-3. Wraps every request in `executionContextStorage.run(ctx, ...)` to enable `waitUntil` polyfilling
+1. Creates a `CloudflareProxyWorld` from the `WORKFLOW` Service Binding
+2. Calls `setWorld()` internally so `start()` and `getRun()` work
+3. Wraps every request in `envStorage.run(env, ...)` for `getCloudflareEnv()`
+4. Wraps every request in `executionContextStorage.run(ctx, ...)` for `waitUntil`
 
 You do not need to write any initialization code yourself.
 

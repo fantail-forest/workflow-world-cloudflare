@@ -18,46 +18,20 @@
 export function createContext(sandbox?: Record<string, unknown>) {
   const ctx: Record<string, unknown> = sandbox ?? {};
 
-  // Math needs its own copy because vm/index.ts modifies Math.random in-place.
-  // All other globals (Date, crypto, etc.) are replaced entirely by vm/index.ts
-  // via assignment, so sharing the reference is safe.
-  if (!("Math" in ctx)) {
-    ctx.Math = Object.create(Object.getPrototypeOf(Math), Object.getOwnPropertyDescriptors(Math));
+  // Seed the context with all globals from globalThis so that vm/index.ts
+  // can override Date, Math, crypto, Symbol, etc. with deterministic versions.
+  // Math gets its own copy because vm/index.ts mutates Math.random in-place.
+  for (const key of Object.getOwnPropertyNames(globalThis)) {
+    if (key in ctx) continue;
+    try {
+      ctx[key] = (globalThis as Record<string, unknown>)[key];
+    } catch {
+      // Some properties may not be readable
+    }
   }
+  ctx.Math = Object.create(Object.getPrototypeOf(Math), Object.getOwnPropertyDescriptors(Math));
 
   return ctx;
-}
-
-function snapshotGlobals(context: Record<string, unknown>): Map<string, { existed: boolean; value: unknown }> {
-  const saved = new Map<string, { existed: boolean; value: unknown }>();
-  for (const key of Object.getOwnPropertyNames(context)) {
-    saved.set(key, { existed: key in globalThis, value: (globalThis as Record<string, unknown>)[key] });
-  }
-  return saved;
-}
-
-function applyGlobals(context: Record<string, unknown>): void {
-  for (const key of Object.getOwnPropertyNames(context)) {
-    try {
-      (globalThis as Record<string, unknown>)[key] = context[key];
-    } catch {
-      // Some globals may be non-writable
-    }
-  }
-}
-
-function restoreGlobals(saved: Map<string, { existed: boolean; value: unknown }>): void {
-  for (const [key, { existed, value }] of saved) {
-    try {
-      if (existed) {
-        (globalThis as Record<string, unknown>)[key] = value;
-      } else {
-        delete (globalThis as Record<string, unknown>)[key];
-      }
-    } catch {
-      // Some globals may be non-configurable
-    }
-  }
 }
 
 const WORKFLOW_NAME_RE = /__private_workflows\?\.get\(("(?:[^"\\]|\\.)*")\)/;
@@ -83,38 +57,29 @@ export function runInContext(code: string, context: Record<string, unknown>, _op
   }
   const workflowName = JSON.parse(matchedName) as string;
 
-  const fns = (globalThis as Record<string, unknown>).__workflow_cloudflare_functions as
-    | Map<string, (...args: unknown[]) => unknown>
+  // Use the pre-compiled code factory injected by the CloudflareBuilder.
+  // This factory executes the compiled workflow code (with step stubs bound
+  // to the context's WORKFLOW_USE_STEP) and returns __private_workflows.
+  const factory = (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory as
+    | ((ctx: Record<string, unknown>) => Map<string, (...args: unknown[]) => unknown>)
     | undefined;
-  if (!fns?.has(workflowName)) {
+
+  if (!factory) {
     throw new Error(
-      `Workflow "${workflowName}" not found in pre-imported functions. ` +
-        "Ensure the CloudflareBuilder registered it in __workflow_cloudflare_functions.",
+      "runInContext polyfill: __workflow_cloudflare_code_factory not found. " +
+        "Ensure the CloudflareBuilder patched the flow-handler.",
     );
   }
-  const workflowFn = fns.get(workflowName);
+
+  const workflows = factory(context);
+  const workflowFn = workflows?.get(workflowName);
 
   if (workflowFn == null) {
     throw new Error(
-      `BUG: Workflow "${workflowName}" not found in pre-imported functions. ` +
-        "Ensure the CloudflareBuilder registered it in __workflow_cloudflare_functions.",
+      `Workflow "${workflowName}" not found in pre-compiled code. ` +
+        `Available: [${workflows ? [...workflows.keys()].join(", ") : "none"}]`,
     );
   }
 
-  // Return a wrapper that temporarily overrides globals with the context's
-  // deterministic versions during workflow execution.
-  //
-  // Safety: queue processing is sequential (one message at a time), globals
-  // are restored in a finally block (even on WorkflowSuspension), and
-  // JavaScript resolves global names at call time so the pre-imported function
-  // sees the overridden Math/Date/crypto/fetch/etc.
-  return async function wrappedWorkflow(...args: unknown[]) {
-    const saved = snapshotGlobals(context);
-    applyGlobals(context);
-    try {
-      return await workflowFn(...args);
-    } finally {
-      restoreGlobals(saved);
-    }
-  };
+  return workflowFn;
 }

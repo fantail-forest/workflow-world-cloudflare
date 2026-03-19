@@ -1,3 +1,4 @@
+import { hydrateResourceIO } from "@workflow/core/serialization-format";
 import type { World } from "@workflow/world";
 import type { WorkflowRunDO } from "./run-do.js";
 
@@ -39,6 +40,15 @@ function matchCapture(subPath: string, pattern: RegExp): string[] | null {
   return m.slice(1).map((g) => g ?? "");
 }
 
+function hydrate<T>(resource: T): T {
+  return hydrateResourceIO(resource as never, {}) as T;
+}
+
+function hydrateList<T extends { data?: unknown[] }>(result: T): T {
+  if (!result || !Array.isArray((result as Record<string, unknown>).data)) return result;
+  return { ...result, data: ((result as Record<string, unknown>).data as unknown[]).map(hydrate) };
+}
+
 async function dispatchInspectRoute(
   subPath: string,
   url: URL,
@@ -49,31 +59,31 @@ async function dispatchInspectRoute(
   const pag = { limit, cursor, sortOrder: "desc" as const };
 
   if (subPath === "/runs") {
-    return Response.json(await world.runs.list({ workflowName, resolveData, pagination: pag }));
+    return Response.json(hydrateList(await world.runs.list({ workflowName, resolveData, pagination: pag })));
   }
 
   const runParams = matchCapture(subPath, /^\/runs\/([^/]+)$/);
   if (runParams) {
     const [runId = ""] = runParams;
-    return Response.json(await world.runs.get(runId, { resolveData }));
+    return Response.json(hydrate(await world.runs.get(runId, { resolveData })));
   }
 
   const stepsParams = matchCapture(subPath, /^\/runs\/([^/]+)\/steps$/);
   if (stepsParams) {
     const [runId = ""] = stepsParams;
-    return Response.json(await world.steps.list({ runId, resolveData, pagination: pag }));
+    return Response.json(hydrateList(await world.steps.list({ runId, resolveData, pagination: pag })));
   }
 
   const stepParams = matchCapture(subPath, /^\/runs\/([^/]+)\/steps\/([^/]+)$/);
   if (stepParams) {
     const [runId = "", stepId = ""] = stepParams;
-    return Response.json(await world.steps.get(runId, stepId, { resolveData }));
+    return Response.json(hydrate(await world.steps.get(runId, stepId, { resolveData })));
   }
 
   const eventsParams = matchCapture(subPath, /^\/runs\/([^/]+)\/events$/);
   if (eventsParams) {
     const [runId = ""] = eventsParams;
-    return Response.json(await world.events.list({ runId, resolveData, pagination: pag }));
+    return Response.json(hydrateList(await world.events.list({ runId, resolveData, pagination: pag })));
   }
 
   const streamsParams = matchCapture(subPath, /^\/runs\/([^/]+)\/streams$/);
@@ -84,13 +94,13 @@ async function dispatchInspectRoute(
 
   if (subPath === "/hooks") {
     const runId = searchParam(url, "runId");
-    return Response.json(await world.hooks.list({ runId, resolveData, pagination: pag }));
+    return Response.json(hydrateList(await world.hooks.list({ runId, resolveData, pagination: pag })));
   }
 
   const hookParams = matchCapture(subPath, /^\/hooks\/([^/]+)$/);
   if (hookParams) {
     const [hookId = ""] = hookParams;
-    return Response.json(await world.hooks.get(hookId, { resolveData }));
+    return Response.json(hydrate(await world.hooks.get(hookId, { resolveData })));
   }
 
   const storageParams = matchCapture(subPath, /^\/runs\/([^/]+)\/storage$/);

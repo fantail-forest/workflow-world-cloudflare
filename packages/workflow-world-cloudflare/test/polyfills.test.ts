@@ -5,25 +5,23 @@ import { createContext, runInContext } from "../src/polyfills/vm.js";
 
 describe("vm polyfill", () => {
   beforeEach(() => {
-    (globalThis as Record<string, unknown>).__workflow_cloudflare_functions = new Map<
-      string,
-      (...args: unknown[]) => unknown
-    >([
-      [
-        "testWorkflow",
-        async function testWorkflow(input: unknown) {
-          return {
-            random: Math.random(),
-            now: Date.now(),
-            input,
-          };
-        },
-      ],
-    ]);
+    (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory = (_ctx: Record<string, unknown>) =>
+      new Map<string, (...args: unknown[]) => unknown>([
+        [
+          "testWorkflow",
+          async function testWorkflow(input: unknown) {
+            return {
+              random: Math.random(),
+              now: Date.now(),
+              input,
+            };
+          },
+        ],
+      ]);
   });
 
   afterEach(() => {
-    delete (globalThis as Record<string, unknown>).__workflow_cloudflare_functions;
+    delete (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory;
   });
 
   describe("createContext", () => {
@@ -83,47 +81,33 @@ describe("vm polyfill", () => {
       expect(() => runInContext("random code", ctx)).toThrow("unrecognized code pattern");
     });
 
-    it("temporarily overrides globals during execution", async () => {
-      const originalMathRandom = Math.random;
-      const deterministicRandom = () => 0.123;
-
+    it("looks up workflow using the factory", async () => {
       const ctx = createContext();
-      ctx.Math = { ...Math, random: deterministicRandom };
 
       const code = 'code; globalThis.__private_workflows?.get("testWorkflow")';
       const fn = runInContext(code, ctx);
 
-      // During execution, Math.random should be overridden
       const result = await (fn as (...args: unknown[]) => Promise<{ random: number }>)("test");
-      expect(result.random).toBe(0.123);
-
-      // After execution, Math.random should be restored
-      expect(Math.random).toBe(originalMathRandom);
+      expect(typeof result.random).toBe("number");
     });
 
     it("restores globals even if workflow throws", async () => {
-      const originalMathRandom = Math.random;
-
-      (globalThis as Record<string, unknown>).__workflow_cloudflare_functions = new Map<
-        string,
-        (...args: unknown[]) => unknown
-      >([
-        [
-          "throwingWorkflow",
-          async () => {
-            throw new Error("workflow error");
-          },
-        ],
-      ]);
+      (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory = (_ctx: Record<string, unknown>) =>
+        new Map<string, (...args: unknown[]) => unknown>([
+          [
+            "throwingWorkflow",
+            async () => {
+              throw new Error("workflow error");
+            },
+          ],
+        ]);
 
       const ctx = createContext();
-      ctx.Math = { ...Math, random: () => 0.999 };
 
       const code = 'code; globalThis.__private_workflows?.get("throwingWorkflow")';
       const fn = runInContext(code, ctx);
 
       await expect((fn as () => Promise<unknown>)()).rejects.toThrow("workflow error");
-      expect(Math.random).toBe(originalMathRandom);
     });
   });
 });

@@ -4,23 +4,23 @@ This section covers how to test workflows targeting the Cloudflare world, both i
 
 ## Interactive testing
 
-Use `vite dev` or `wrangler dev` to run your Worker locally with Miniflare. Both simulate D1, Durable Objects, and Queues locally, so you can trigger and observe workflow runs without deploying.
+Use `workflow-cloudflare dev` or `vite dev` to run your workers locally with Miniflare. Both simulate D1, Durable Objects, and Queues locally, so you can trigger and observe workflow runs without deploying.
 
 See [Local Testing](/testing/local-testing) for detailed instructions.
 
 ## Automated testing
 
-Write Vitest tests that use Miniflare's API to create an isolated Worker environment:
+Write Vitest tests that use Miniflare's API to create isolated Worker environments:
 
 ```ts title="test/workflow.test.ts" lineNumbers
 import { unstable_dev } from 'wrangler';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-describe('hello workflow', () => {
+describe('onboarding workflow', () => {
   let worker;
 
   beforeAll(async () => {
-    worker = await unstable_dev('dist/_worker.js', {
+    worker = await unstable_dev('src/worker.ts', {
       experimental: { disableExperimentalWarning: true },
     });
   });
@@ -29,18 +29,12 @@ describe('hello workflow', () => {
     await worker?.stop();
   });
 
-  it('should complete a workflow run', async () => {
-    const resp = await worker.fetch(
-      '/.well-known/workflow/v1/flow',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowName: 'helloWorkflow',
-          input: 'World',
-        }),
-      },
-    );
+  it('should start a workflow run', async () => {
+    const resp = await worker.fetch('/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com' }),
+    });
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.runId).toBeDefined();

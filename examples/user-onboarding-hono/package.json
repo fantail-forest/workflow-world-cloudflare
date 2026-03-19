@@ -1,0 +1,25 @@
+{
+  "name": "user-onboarding-hono-example",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "inspect": "workflow-cloudflare inspect"
+  },
+  "dependencies": {
+    "@workflow/errors": "^4.1.0-beta.18",
+    "@workflow/world": "^4.1.0-beta.13",
+    "hono": "^4.0.0",
+    "workflow": "^4.2.0-beta.71",
+    "workflow-world-cloudflare": "*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.0.0",
+    "@cloudflare/workers-types": "^4.20260305.0",
+    "vite": "^6.0.0",
+    "vite-plugin-workflow-cloudflare": "*",
+    "wrangler": "^4.0.0"
+  }
+}

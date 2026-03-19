@@ -148,6 +148,10 @@ test-results/
 # reference directory (dependency source code)
 reference/
 
+# SWC compiler cache
+.swc/
+
 # vitepress stuff
 docs/.vitepress/dist
 docs/.vitepress/cache
+docs/.vitepress/*.timestamp-*

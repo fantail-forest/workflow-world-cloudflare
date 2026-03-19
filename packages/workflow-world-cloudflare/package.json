@@ -32,6 +32,18 @@
     "./builder": {
       "types": "./dist/builder.d.ts",
       "default": "./dist/builder.js"
+    },
+    "./with-workflow": {
+      "types": "./dist/with-workflow.d.ts",
+      "default": "./dist/with-workflow.js"
+    },
+    "./proxy-world": {
+      "types": "./dist/proxy-world.d.ts",
+      "default": "./dist/proxy-world.js"
+    },
+    "./service-entrypoint": {
+      "types": "./dist/service-entrypoint.d.ts",
+      "default": "./dist/service-entrypoint.js"
     }
   },
   "bin": {
@@ -61,6 +73,7 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
+    "@workflow/core": "*",
     "@workflow/errors": "*",
     "@workflow/world": "*"
   },

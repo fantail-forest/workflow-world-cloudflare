@@ -66,6 +66,15 @@ function requireDate(s: string | null | undefined, field: string): Date {
   return d;
 }
 
+// SqlStorage returns blob columns as ArrayBuffer, but @workflow/core's
+// hydrateWorkflowArguments checks `instanceof Uint8Array`.
+function toUint8Array(val: unknown): Uint8Array | undefined {
+  if (val == null) return undefined;
+  if (val instanceof Uint8Array) return val;
+  if (val instanceof ArrayBuffer) return new Uint8Array(val);
+  return val as Uint8Array;
+}
+
 function rowToRun(row: Record<string, unknown>): WorkflowRun {
   const run = {
     runId: row.runId as string,
@@ -74,8 +83,8 @@ function rowToRun(row: Record<string, unknown>): WorkflowRun {
     deploymentId: row.deploymentId as string,
     specVersion: row.specVersion as number | undefined,
     executionContext: parseJson(row.executionContext as string),
-    input: row.input ?? undefined,
-    output: row.output ?? undefined,
+    input: toUint8Array(row.input),
+    output: toUint8Array(row.output),
     error: parseJson<StructuredError>(row.error as string),
     expiredAt: parseDate(row.expiredAt as string),
     startedAt: parseDate(row.startedAt as string),
@@ -92,8 +101,8 @@ function rowToStep(row: Record<string, unknown>): Step {
     stepId: row.stepId as string,
     stepName: row.stepName as string,
     status: row.status as string,
-    input: row.input ?? undefined,
-    output: row.output ?? undefined,
+    input: toUint8Array(row.input),
+    output: toUint8Array(row.output),
     error: parseJson<StructuredError>(row.error as string),
     attempt: row.attempt as number,
     startedAt: parseDate(row.startedAt as string),
@@ -122,13 +131,55 @@ function rowToHook(row: Record<string, unknown>): Hook {
   return HookSchema.parse(compact(hook));
 }
 
+// Binary-safe JSON: Uint8Array values survive JSON.stringify round-trips.
+// We encode them as { __u8: "<base64>" } objects and restore on parse.
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Uint8Array) {
+    return { __u8: uint8ToBase64(value) };
+  }
+  if (value instanceof ArrayBuffer) {
+    return { __u8: uint8ToBase64(new Uint8Array(value)) };
+  }
+  return value;
+}
+
+function jsonReviver(_key: string, value: unknown): unknown {
+  if (value && typeof value === "object" && "__u8" in (value as Record<string, unknown>)) {
+    const encoded = (value as Record<string, string>).__u8 ?? "";
+    return base64ToUint8(encoded);
+  }
+  return value;
+}
+
+function uint8ToBase64(u8: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i] ?? 0);
+  return btoa(binary);
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const u8 = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+  return u8;
+}
+
 function rowToEvent(row: Record<string, unknown>, runId: string): Event {
+  const raw = row.eventData as string | null | undefined;
+  let eventData: unknown;
+  if (raw) {
+    try {
+      eventData = JSON.parse(raw, jsonReviver);
+    } catch {
+      eventData = undefined;
+    }
+  }
   const event = {
     runId,
     eventId: row.eventId as string,
     eventType: row.eventType as string,
     correlationId: row.correlationId as string | undefined,
-    eventData: parseJson(row.eventData as string),
+    eventData,
     specVersion: row.specVersion as number | undefined,
     createdAt: requireDate(row.createdAt as string, "createdAt"),
   };
@@ -630,7 +681,7 @@ function insertEvent(
     eventId,
     data.eventType as string,
     (data.correlationId as string) ?? null,
-    "eventData" in data && data.eventData != null ? JSON.stringify(data.eventData) : null,
+    "eventData" in data && data.eventData != null ? JSON.stringify(data.eventData, jsonReplacer) : null,
     specVersion,
   );
 }

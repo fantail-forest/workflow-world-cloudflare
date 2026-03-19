@@ -18,7 +18,7 @@ When a workflow or step file changes, the plugin re-runs the SWC transform and t
 
 ### Production (`vite build`)
 
-When you run `vite build`, the plugin invokes `CloudflareBuilder` to produce the full production Worker bundle. This is equivalent to running `npx workflow-cloudflare build` directly.
+When you run `vite build`, the plugin invokes `CloudflareBuilder` to produce the two-worker output. This is equivalent to running `npx workflow-cloudflare build` directly.
 
 To configure the production build, pass `appName` and optionally `wranglerFormat` to the plugin:
 
@@ -33,16 +33,17 @@ export default defineConfig({
       appName: 'my-app',
       wranglerFormat: 'toml',
     }),
-    cloudflare({ configPath: './wrangler.toml', persistState: true }),
+    cloudflare({ persistState: true }),
   ],
 });
 ```
 
 After `vite build` completes, you'll find:
-- `dist/_worker.js` -- the production Worker bundle
-- `wrangler.toml` (or `.jsonc`) -- the generated wrangler config
+- `dist/service-worker/_worker.js` -- the workflow service worker
+- `dist/service-worker/wrangler.toml` -- service worker config
+- `wrangler.toml` -- your worker config (with Service Binding)
 
-Deploy with `wrangler deploy` as usual.
+Deploy both workers with `wrangler deploy`.
 
 ## Next steps
 

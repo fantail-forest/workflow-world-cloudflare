@@ -1,6 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-export const envStorage = new AsyncLocalStorage<Record<string, unknown>>();
+// Use a global singleton so the same AsyncLocalStorage instance is shared
+// across separately-bundled handler files (_worker.js, step-handler.js, etc.)
+const ENV_STORAGE_KEY = Symbol.for("workflow-cloudflare:envStorage");
+const g = globalThis as Record<symbol, unknown>;
+if (!g[ENV_STORAGE_KEY]) {
+  g[ENV_STORAGE_KEY] = new AsyncLocalStorage<Record<string, unknown>>();
+}
+export const envStorage = g[ENV_STORAGE_KEY] as AsyncLocalStorage<Record<string, unknown>>;
 
 /**
  * Access Cloudflare Worker environment bindings from within a step function.

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve, join } from "node:path";
+
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -18,19 +22,6 @@ function parseFlags(args) {
     }
   }
   return flags;
-}
-
-function _getPositionalArgs(args) {
-  const positional = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith('--')) {
-      const next = args[i + 1];
-      if (next && !next.startsWith('--')) i++;
-      continue;
-    }
-    positional.push(args[i]);
-  }
-  return positional;
 }
 
 async function runBuild(flags) {
@@ -55,6 +46,7 @@ async function runBuild(flags) {
     stepsBundlePath: 'dist/step-handler.js',
     workflowsBundlePath: 'dist/flow-handler.js',
     webhookBundlePath: 'dist/webhook-handler.js',
+    clientBundlePath: 'dist/client.js',
     wranglerFormat: flags.format || undefined,
     suppressCreateWorkflowsBundleLogs: false,
     suppressCreateWorkflowsBundleWarnings: false,
@@ -71,6 +63,74 @@ async function runBuild(flags) {
   }
 }
 
+async function runDev(flags) {
+  const workingDir = flags.dir || process.cwd();
+  const format = flags.format || 'toml';
+
+  const serviceConfigExt = format === 'jsonc' ? 'jsonc' : 'toml';
+  const serviceConfigPath = resolve(
+    workingDir,
+    `dist/service-worker/wrangler.${serviceConfigExt}`
+  );
+
+  if (!existsSync(serviceConfigPath)) {
+    console.error(
+      'Error: Service worker config not found. Run `workflow-cloudflare build` first.'
+    );
+    process.exit(1);
+  }
+
+  console.log('Starting workflow service worker...');
+  const serviceWorker = spawn(
+    'npx',
+    ['wrangler', 'dev', '-c', serviceConfigPath, '--port', '8787'],
+    {
+      cwd: join(workingDir, 'dist/service-worker'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: true,
+    }
+  );
+
+  serviceWorker.stdout.on('data', (data) => {
+    process.stdout.write(`[service] ${data}`);
+  });
+  serviceWorker.stderr.on('data', (data) => {
+    process.stderr.write(`[service] ${data}`);
+  });
+
+  // Wait for service worker to start before launching user worker
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  console.log('Starting user worker...');
+  const userWorker = spawn('npx', ['wrangler', 'dev', '--port', '8788'], {
+    cwd: workingDir,
+    stdio: 'inherit',
+    shell: true,
+  });
+
+  function cleanup() {
+    serviceWorker.kill();
+    userWorker.kill();
+    process.exit(0);
+  }
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  userWorker.on('exit', (code) => {
+    serviceWorker.kill();
+    process.exit(code ?? 0);
+  });
+
+  serviceWorker.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`Service worker exited with code ${code}`);
+      userWorker.kill();
+      process.exit(code);
+    }
+  });
+}
+
 async function runInspect(subArgs) {
   const { runInspectCommand } = await import('../dist/inspect-client.js');
   await runInspectCommand(subArgs);
@@ -81,12 +141,17 @@ function printUsage() {
 
 Commands:
   build     Build workflow app for Cloudflare Workers
+  dev       Start both workers locally (service + user)
   inspect   Inspect workflow runs, steps, events, hooks, and streams
 
 Build options:
   --name <name>         App name (required) -- namespaces all Cloudflare resources
   --format <toml|jsonc> Wrangler config format (default: auto-detect, then toml)
   --dir <path>          Working directory (default: cwd)
+
+Dev options:
+  --dir <path>          Working directory (default: cwd)
+  --format <toml|jsonc> Wrangler config format (default: toml)
 
 Inspect options:
   --url <url>           Deployed Worker URL (required)
@@ -114,6 +179,9 @@ if (!command || command === '--help' || command === '-h') {
 if (command === 'build') {
   const flags = parseFlags(args.slice(1));
   runBuild(flags);
+} else if (command === 'dev') {
+  const flags = parseFlags(args.slice(1));
+  runDev(flags);
 } else if (command === 'inspect') {
   runInspect(args.slice(1));
 } else {

@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you through deploying a Workflow DevKit app to Cloudflare Workers.
+This guide walks you through deploying a Workflow DevKit app to Cloudflare Workers using the two-worker architecture.
 
 ## Prerequisites
 
@@ -11,15 +11,25 @@ This guide walks you through deploying a Workflow DevKit app to Cloudflare Worke
 ## Install packages
 
 ```bash
-npm add @workflow/core workflow-world-cloudflare
+npm add workflow workflow-world-cloudflare @workflow/errors @workflow/world zod
 npm add -D @cloudflare/workers-types wrangler
+```
+
+Add a `#workflows` import map to your `package.json`:
+
+```json
+{
+  "imports": {
+    "#workflows": "./dist/client.js"
+  }
+}
 ```
 
 ## Write a workflow
 
 Create a file at `workflows/hello.ts`:
 
-```ts title="workflows/hello.ts" lineNumbers
+```ts
 export async function helloWorkflow(name: string) {
   "use workflow";
   const greeting = await greet(name);
@@ -32,7 +42,48 @@ async function greet(name: string) {
 }
 ```
 
-## Build for Cloudflare
+## Write your worker
+
+Create `src/worker.ts`:
+
+```ts
+import { withWorkflow } from "workflow-world-cloudflare/with-workflow";
+import { start, getRun } from "@workflow/core/runtime";
+import { helloWorkflow } from "#workflows";
+
+export default withWorkflow({
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/start" && request.method === "POST") {
+      const { name } = await request.json();
+      const run = await start(helloWorkflow, [name]);
+      return Response.json({ runId: run.runId });
+    }
+
+    if (url.pathname === "/status") {
+      const runId = url.searchParams.get("runId");
+      if (!runId) return Response.json({ error: "Missing runId" }, { status: 400 });
+      const run = getRun(runId);
+      return Response.json({ status: await run.status, output: await run.output });
+    }
+
+    return new Response("Hello Workflow API");
+  },
+});
+```
+
+`withWorkflow()` sets up the connection to the generated workflow service worker via a Service Binding. You use `start()` and `getRun()` from `workflow/api` to interact with workflows -- no boilerplate, no infrastructure code.
+
+## Configure your worker
+
+Create `wrangler.app.toml`:
+
+```toml
+main = "src/worker.ts"
+```
+
+## Build
 
 ```bash
 npx workflow-cloudflare build --name my-app
@@ -44,76 +95,68 @@ You can also build via Vite -- see [Using with Vite](/vite/).
 
 This produces:
 
-- `dist/_worker.js` - bundled Worker entry point with polyfills and module aliases
-- `wrangler.toml` - generated config with all required bindings pre-filled
+```
+dist/
+  service-worker/          # Generated workflow service worker
+    _worker.js             # Entry with DOs, queue handler, RPC entrypoint
+    wrangler.toml          # Service worker config
+  client.js                # Client library with workflow stubs
+wrangler.toml              # Your worker config (with Service Binding)
+```
 
 ## Create Cloudflare resources
 
-Before the first deploy, create the D1 database and Queues. The resource names are derived from your app name:
+Before the first deploy, create the D1 database and Queues:
 
 ```bash
-# Create the D1 database
 wrangler d1 create my-app-workflow-db
-
-# Create the queues
 wrangler queues create my-app-workflow-runs
 wrangler queues create my-app-workflow-steps
 ```
 
-Copy the D1 database ID from the output and update `wrangler.toml`:
-
-```toml
-[[d1_databases]]
-binding = "WORKFLOW_DB"
-database_name = "my-app-workflow-db"
-database_id = "your-database-id-here"
-```
-
-The D1 index tables are created automatically on first request -- no manual schema setup is needed.
+Copy the D1 database ID from the output and update `dist/service-worker/wrangler.toml`.
 
 ## Deploy
 
+Deploy both workers:
+
 ```bash
+# Deploy the workflow service worker
+wrangler deploy -c dist/service-worker/wrangler.toml
+
+# Deploy your application worker
 wrangler deploy
 ```
 
-## Trigger a workflow run
+## Run locally
 
 ```bash
-curl -X POST https://your-worker.your-subdomain.workers.dev/.well-known/workflow/v1/flow \
-  -H 'Content-Type: application/json' \
-  -d '{"workflowName": "helloWorkflow", "input": "World"}'
+npx workflow-cloudflare dev
 ```
 
-## Verify completion
+This starts both workers locally with Service Bindings resolved by Miniflare.
 
-Check the workflow run status:
+## Trigger a workflow
 
 ```bash
-curl https://your-worker.your-subdomain.workers.dev/.well-known/workflow/v1/flow?runId=<run-id>
+curl -X POST http://localhost:8788/start \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "World"}'
 ```
 
 ## Inspect workflow runs
 
-To inspect runs from the terminal, set a `WORKFLOW_INSPECT_TOKEN` secret on your Worker:
-
-```bash
-wrangler secret put WORKFLOW_INSPECT_TOKEN
-```
-
-Then use the inspect CLI:
+Set a `WORKFLOW_INSPECT_TOKEN` secret (or use the `dev-secret` var in `wrangler.app.toml` for local dev):
 
 ```bash
 npx workflow-cloudflare inspect runs \
-  --url https://my-app.your-subdomain.workers.dev \
-  --token <your-secret>
+  --url http://localhost:8787 \
+  --token dev-secret
 ```
-
-See [Inspecting runs](/configuration/#inspecting-runs) for the full list of inspect subcommands.
 
 ## Next steps
 
-- [Configuration](/configuration/) - customize your wrangler config, add bindings, and enable inspect
-- [Architecture](/architecture/) - understand how Workflow DevKit maps to Cloudflare resources
-- [Vite Integration](/vite/project-setup) - set up local dev with HMR
-- [Testing](/testing/) - test your workflows locally
+- [Tutorials](/tutorials/user-onboarding-worker) -- Full walkthrough with a real-world workflow
+- [Configuration](/configuration/) -- Customize your wrangler config, add bindings, and enable inspect
+- [Architecture](/architecture/) -- Understand the two-worker model and Service Bindings
+- [Vite Integration](/vite/project-setup) -- Set up local dev with HMR

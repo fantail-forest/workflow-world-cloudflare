@@ -1,0 +1,23 @@
+{
+  "name": "user-onboarding-worker-example",
+  "private": true,
+  "scripts": {
+    "build": "workflow-cloudflare build --name user-onboarding",
+    "dev": "workflow-cloudflare dev",
+    "inspect": "workflow-cloudflare inspect"
+  },
+  "dependencies": {
+    "@workflow/errors": "^4.1.0-beta.18",
+    "@workflow/world": "^4.1.0-beta.13",
+    "workflow": "^4.2.0-beta.71",
+    "workflow-world-cloudflare": "*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260305.0",
+    "wrangler": "^4.0.0"
+  },
+  "imports": {
+    "#workflows": "./dist/client.js"
+  }
+}

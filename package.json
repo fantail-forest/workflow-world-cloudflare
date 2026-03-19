@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "docs"
+    "docs",
+    "examples/*"
   ],
   "scripts": {
     "i": "yarn install && yarn postinstall",
@@ -31,8 +32,10 @@
     "esbuild": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "mermaid": "^11.13.0",
     "turbo": "^2.8.11",
     "typescript": "catalog:",
+    "vitepress-plugin-mermaid": "^2.0.17",
     "vitest": "catalog:"
   }
 }

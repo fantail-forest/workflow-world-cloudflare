@@ -29,6 +29,21 @@ function streamToBuffer(stream: ReadableStream<Uint8Array>): Promise<Uint8Array>
   return read();
 }
 
+export class DuplicateMessageError extends Error {
+  constructor(message?: string) {
+    super(message ?? "Duplicate message");
+    this.name = "DuplicateMessageError";
+  }
+}
+
+export class QueueClient {
+  constructor(_options?: unknown) {
+    throw new Error(
+      "QueueClient is not available on Cloudflare Workers. " + "Use Cloudflare Queues via the env bindings instead.",
+    );
+  }
+}
+
 export class JsonTransport {
   contentType = "application/json";
   private replacer?: (key: string, value: unknown) => unknown;

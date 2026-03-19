@@ -66,6 +66,16 @@ The `getCloudflareEnv()` function only works inside step functions, which run wi
 
 This prevents accidental binding access from deterministic workflow code.
 
+## Two-worker isolation
+
+The two-worker architecture provides additional security boundaries:
+
+- **No public workflow routes**: Flow and step handlers are internal to the service worker. They are called by the queue consumer, not exposed as HTTP endpoints.
+- **Auth-gated inspect endpoints**: The `/.well-known/workflow/v1/inspect/*` routes require `Authorization: Bearer <token>` matching the `WORKFLOW_INSPECT_TOKEN` secret. If the secret is not set, these routes return 404.
+- **Auth-gated webhook endpoints**: Webhook endpoints are served by the service worker with the same auth requirements.
+- **Private manifest**: The `/.well-known/workflow/v1/manifest.json` endpoint is disabled by default. Set `WORKFLOW_PUBLIC_MANIFEST=1` as an environment variable to expose it.
+- **Service Binding boundary**: Your worker communicates with the service worker through a Cloudflare Service Binding (RPC), not HTTP. This means workflow infrastructure is not on your worker's public request surface.
+
 ## Polyfill maintenance coupling
 
 The `node:vm` polyfill relies on pattern-matching two specific `runInContext` call patterns from `@workflow/core`. If the core changes how it calls `runInContext`, the polyfill will need updating. This is a maintenance coupling, not a security concern.

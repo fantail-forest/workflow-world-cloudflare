@@ -20,6 +20,12 @@ export {
   type WorkerHandlersConfig,
 } from "./worker-handlers.js";
 
+// Heavy re-exports that pull in @workflow/core are intentionally omitted here
+// to avoid bundling issues. Use the dedicated subpath exports instead:
+//   workflow-world-cloudflare/with-workflow   → withWorkflow, WithWorkflowOptions
+//   workflow-world-cloudflare/proxy-world     → createProxyWorld, WorkflowServiceRPC
+//   workflow-world-cloudflare/service-entrypoint → WorkflowServiceEntrypoint
+
 let d1Migrated = false;
 
 async function ensureD1Schema(db: D1Database): Promise<void> {

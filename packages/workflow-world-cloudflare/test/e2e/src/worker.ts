@@ -111,9 +111,11 @@ async function handleRunsRoute(request: Request, world: World): Promise<Response
 
 async function handleVmPolyfill(_request: Request): Promise<Response> {
   const mockWorkflowFn = async (...args: unknown[]) => ({ sum: (args[0] as number) + (args[1] as number) });
-  const gMap = new Map<string, (...args: unknown[]) => unknown>();
-  gMap.set("workflow//test//myWorkflow", mockWorkflowFn);
-  (globalThis as Record<string, unknown>).__workflow_cloudflare_functions = gMap;
+  (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory = (_ctx: Record<string, unknown>) => {
+    const workflows = new Map<string, (...args: unknown[]) => unknown>();
+    workflows.set("workflow//test//myWorkflow", mockWorkflowFn);
+    return workflows;
+  };
 
   const ctx = createContext({});
   const ctxResult = runInContext("globalThis", ctx);
@@ -136,7 +138,7 @@ async function handleVmPolyfill(_request: Request): Promise<Response> {
     missingThrew = true;
   }
 
-  delete (globalThis as Record<string, unknown>).__workflow_cloudflare_functions;
+  delete (globalThis as Record<string, unknown>).__workflow_cloudflare_code_factory;
   return Response.json({
     contextReturned: ctxResult === ctx,
     workflowResult: result,

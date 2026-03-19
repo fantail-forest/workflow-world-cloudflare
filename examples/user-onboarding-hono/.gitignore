@@ -1,0 +1,7 @@
+dist/
+.well-known/
+.swc/
+wrangler.toml
+wrangler.jsonc
+.wrangler/
+node_modules/
