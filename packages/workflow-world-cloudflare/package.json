@@ -1,0 +1,96 @@
+{
+  "name": "workflow-world-cloudflare",
+  "version": "0.1.0",
+  "description": "Cloudflare Workers world implementation for Workflow DevKit",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./polyfills/vm": {
+      "types": "./dist/polyfills/vm.d.ts",
+      "default": "./dist/polyfills/vm.js"
+    },
+    "./polyfills/module": {
+      "types": "./dist/polyfills/module.d.ts",
+      "default": "./dist/polyfills/module.js"
+    },
+    "./polyfills/vercel-functions": {
+      "types": "./dist/polyfills/vercel-functions.d.ts",
+      "default": "./dist/polyfills/vercel-functions.js"
+    },
+    "./polyfills/vercel-queue": {
+      "types": "./dist/polyfills/vercel-queue.d.ts",
+      "default": "./dist/polyfills/vercel-queue.js"
+    },
+    "./durable-objects": {
+      "types": "./dist/durable-objects.d.ts",
+      "default": "./dist/durable-objects.js"
+    },
+    "./builder": {
+      "types": "./dist/builder.d.ts",
+      "default": "./dist/builder.js"
+    }
+  },
+  "bin": {
+    "workflow-cloudflare": "./bin/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "src/d1-schema.sql",
+    "src/run-do-schema.sql"
+  ],
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "tsc --build --clean && rm -rf dist",
+    "test": "vitest run --exclude '**/e2e/**'",
+    "test:e2e": "vitest run test/e2e/spec.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/queue": "catalog:",
+    "@workflow/builders": "catalog:",
+    "cbor-x": "1.6.0",
+    "esbuild": "catalog:",
+    "ulid": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@workflow/errors": "*",
+    "@workflow/world": "*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260305.0",
+    "@types/node": "catalog:",
+    "tsx": "4.21.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "4.75.0"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "durable-objects",
+    "workflow",
+    "devkit"
+  ],
+  "author": {
+    "name": "Benjamin Burns",
+    "email": "ben@fantailforest.com",
+    "url": "https://fantail-forest.github.io/workflow-world-cloudflare/"
+  },
+  "homepage": "https://fantail-forest.github.io/workflow-world-cloudflare/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fantail-forest/workflow-world-cloudflare.git",
+    "directory": "packages/workflow-world-cloudflare"
+  },
+  "bugs": {
+    "url": "https://github.com/fantail-forest/workflow-world-cloudflare/issues"
+  }
+}

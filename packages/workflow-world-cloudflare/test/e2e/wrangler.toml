@@ -1,0 +1,34 @@
+# Test-only wrangler config for e2e tests (Miniflare)
+name = "workflow-e2e-test"
+main = "dist/worker.js"
+compatibility_date = "2026-02-24"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "RUN_DO", class_name = "WorkflowRunDO" },
+  { name = "STREAM_DO", class_name = "WorkflowStreamDO" },
+]
+
+[[d1_databases]]
+binding = "WORKFLOW_DB"
+database_name = "workflow-test"
+database_id = "e2e-test-db"
+
+[[queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "workflow-runs"
+
+[[queues.producers]]
+binding = "WORKFLOW_STEP_QUEUE"
+queue = "workflow-steps"
+
+[[queues.consumers]]
+queue = "workflow-runs"
+
+[[queues.consumers]]
+queue = "workflow-steps"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WorkflowRunDO", "WorkflowStreamDO"]

@@ -1,0 +1,60 @@
+{
+  "name": "vite-plugin-workflow-cloudflare",
+  "version": "0.1.0",
+  "description": "Vite plugin for Workflow DevKit on Cloudflare Workers with HMR support",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "tsc --build --clean && rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workflow/builders": "catalog:",
+    "esbuild": "catalog:",
+    "tinyglobby": "0.2.15"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^6.3.0"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0",
+    "workflow-world-cloudflare": "workspace:*"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "vite-plugin",
+    "vite",
+    "workflow",
+    "devkit",
+    "hmr"
+  ],
+  "author": {
+    "name": "Benjamin Burns",
+    "email": "ben@fantailforest.com",
+    "url": "https://fantail-forest.github.io/workflow-world-cloudflare/"
+  },
+  "homepage": "https://fantail-forest.github.io/workflow-world-cloudflare/vite/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fantail-forest/workflow-world-cloudflare.git",
+    "directory": "packages/vite-plugin-workflow-cloudflare"
+  },
+  "bugs": {
+    "url": "https://github.com/fantail-forest/workflow-world-cloudflare/issues"
+  }
+}

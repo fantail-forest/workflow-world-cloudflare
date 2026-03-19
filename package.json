@@ -1,0 +1,38 @@
+{
+  "name": "workflow-world-cloudflare-monorepo",
+  "packageManager": "yarn@4.13.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "docs"
+  ],
+  "scripts": {
+    "i": "yarn install && yarn postinstall",
+    "build": "yarn turbo build",
+    "build:docs": "yarn workspace workflow-world-cloudflare-docs build",
+    "check": "yarn lint",
+    "check:fix": "yarn lint:fix",
+    "clean": "rimraf packages/*/dist && rimraf packages/**/*.tsbuildinfo",
+    "clean:all": "yarn clean && rimraf packages/*/node_modules && rimraf node_modules",
+    "cli": "./node_modules/.bin/workflow-cloudflare",
+    "format": "yarn run -T biome format",
+    "format:fix": "yarn run -T biome format --write",
+    "lint": "yarn run -T biome check --assist-enabled true --max-diagnostics 10000",
+    "lint:fix": "yarn run -T biome check --assist-enabled true --max-diagnostics 10000 --write",
+    "postinstall": "echo \"initializing husky\" && husky",
+    "test": "vitest run",
+    "typecheck": "yarn turbo typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@changesets/changelog-github": "0.5.2",
+    "@changesets/cli": "^2.29.8",
+    "@vitest/coverage-v8": "catalog:",
+    "esbuild": "catalog:",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "turbo": "^2.8.11",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
