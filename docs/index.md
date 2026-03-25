@@ -1,8 +1,8 @@
 ---
 layout: home
 hero:
-  name: Workflow DevKit for Cloudflare
-  tagline: Deploy durable, long-running workflows to Cloudflare Workers
+  name: Cloudflare World for Workflow DevKit
+  tagline: Deploy durable workflows written with Workflow DevKit to Cloudflare workers
   actions:
     - theme: brand
       text: Get Started

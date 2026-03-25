@@ -8,7 +8,11 @@
   "files": {
     "ignoreUnknown": false,
     "includes": [
-      "docs/**/*.ts",
+      "docs/.vitepress/*.ts",
+      "docs/.vitepress/components/**/*.ts",
+      "docs/.vitepress/components/**/*.vue",
+      "docs/.vitepress/theme/**/*.ts",
+      "docs/.vitepress/theme/**/*.vue",
       "examples/*/src/**",
       "examples/*/test/**",
       "examples/*/*.ts",
@@ -85,5 +89,13 @@
     "formatter": {
       "quoteStyle": "double"
     }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "html": {
+    "experimentalFullSupportEnabled": true
   }
 }

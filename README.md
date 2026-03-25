@@ -1,5 +1,8 @@
 # workflow-world-cloudflare
 
+> [!WARNING]
+> This project is currently in development and is not yet fully working.
+
 Cloudflare Workers deployment target for the Workflow DevKit. Uses a two-worker architecture with Service Bindings to provide a clean, framework-agnostic DX.
 
 | Workflow DevKit | Cloudflare Resource |
